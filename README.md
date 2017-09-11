@@ -54,21 +54,24 @@ optional arguments:
 
 Dump `stats` db:
 ```
-./influx-backup.py --url https://influxdb.localhost:8086 --user admin --dump --db stats --dir stats
+./influx-backup.py --url https://influxdb.localhost:8086 --user admin --dump --dump-db stats --dir stats
 ```
 Dump `heartbeat` measurement from `stats` db with data until 2017-09-01:
 ```
-./influx-backup.py --url https://influxdb.localhost:8086 --user admin --dump --db stats --dir stats --dump-until 2017-09-01 --measurements heartbeat
+./influx-backup.py --url https://influxdb.localhost:8086 --user admin --dump --dump-db stats --dir stats \
+    --dump-until 2017-09-01 --measurements heartbeat
 ```
 NOTE: If you get `ChunkedEncodingError` on dump, try to limit the data set using "since", "until" arguments.
 
 Restore from `stats` dir into `stats_new` db:
 ```
-./influx-backup.py --url https://influxdb.localhost:8086 --user admin --restore --restore-db stats_new --dir stats
+./influx-backup.py --url https://influxdb.localhost:8086 --user admin --restore --restore-db stats_new \
+    --dir stats
 ```
 Restore only `heartbeat` measurement from `stats` dir into `stats_new` db:
 ```
-./influx-backup.py --url https://influxdb.localhost:8086 --user admin --restore --restore-db stats_new --dir stats --measurements heartbeat
+./influx-backup.py --url https://influxdb.localhost:8086 --user admin --restore --restore-db stats_new \
+    --dir stats --measurements heartbeat
 ```
 
 ## influx-cq.py
