@@ -9,6 +9,7 @@ import json
 import os
 import requests
 import sys
+import time
 
 READ_CHUCK_SIZE = 10000
 WRITE_CHUNK_SIZE = 5000
@@ -87,7 +88,7 @@ def format_rows(m, msfields, data):
                     sys.exit(-1)
 
                 # Format: agent_status,agent=foo\ bar,tenant=roman duration_in_old_status=1207920,new_status="offline",old_status="available" 1496310265009000000
-                rows.append('%s,%s %s %s\n' % (m, ','.join(tags), ' '.join(fields), timestamp))
+                rows.append('%s,%s %s %s\n' % (m, ','.join(tags), ','.join(fields), timestamp))
 
     return rows
 
@@ -142,11 +143,17 @@ def dump(db, measurements, from_measurement, where):
 
 def write_points(db, lines):
     """Write points to InfluxDB."""
-    data = '\n'.join(lines)
-    r = requests.post(URL+'/write', auth=AUTH, params={'db': db}, data=data)
-    if r.status_code != 204:
-        print r.status_code, r.text
-        sys.exit(-1)
+    data = ''.join(lines)
+    retries = 10
+    while retries > 0:
+        r = requests.post(URL+'/write', auth=AUTH, params={'db': db}, data=data)
+        if r.status_code == 204:
+            return
+        retries -= 1
+        time.sleep(1)
+
+    print r.status_code, r.text
+    sys.exit(-1)
 
 
 def restore(db, measurements, from_measurement):
@@ -164,6 +171,7 @@ def restore(db, measurements, from_measurement):
 
     if raw_input('> Confirm restore into "%s" db? [yes/no] ' % db) != 'yes':
         sys.exit()
+    print
     for m in measurements:
         print 'Loading %s...' % m,
         lines = []
@@ -208,6 +216,9 @@ if __name__ == '__main__':
     parser.add_argument('--restore', action='store_true', help='restore from a backup')
     parser.add_argument('--restore-db', help='database target of restore')
     args = parser.parse_args()
+
+    if 'REQUESTS_CA_BUNDLE' not in os.environ:
+        os.environ['REQUESTS_CA_BUNDLE'] = '/etc/ssl/certs/ca-certificates.crt'
 
     URL = args.url
     password = os.getenv('INFLUX_PW')
