@@ -11,6 +11,7 @@ InfluxDB backup/restore script using HTTP API and line-protocol format.
 * Separate file for each measurement
 * Backup/restore individual measurements
 * Incremental backups using "since", "until" arguments
+* Delayed restore
 
 Tested on InfluxDB version `1.3.5`.
 
@@ -24,7 +25,8 @@ usage: influx-backup.py [-h] --url URL --user USER --dir DIR
                         [--dump-db DUMP_DB] [--dump-since DUMP_SINCE]
                         [--dump-until DUMP_UNTIL] [--restore]
                         [--restore-db RESTORE_DB] [--restore-rp RESTORE_RP]
-                        [--restore-delay RESTORE_DELAY]
+                        [--restore-chunk-delay RESTORE_CHUNK_DELAY]
+                        [--restore-measurement-delay RESTORE_MEASUREMENT_DELAY]
 
 InfluxDB backup script
 
@@ -50,9 +52,11 @@ optional arguments:
                         database target of restore
   --restore-rp RESTORE_RP
                         retention to restore to
-  --restore-delay RESTORE_DELAY
+  --restore-chunk-delay RESTORE_CHUNK_DELAY
                         restore delay in sec or subsec between chunks of 5000
                         points
+  --restore-measurement-delay RESTORE_MEASUREMENT_DELAY
+                        restore delay in sec or subsec between measurements
 ```
 
 ### Examples

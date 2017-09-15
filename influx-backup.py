@@ -141,10 +141,10 @@ def dump(db, measurements, from_measurement, where):
         f.close()
 
 
-def write_points(db, retention, lines, delay):
+def write_points(db, retention, lines, chunk_delay):
     """Write points to InfluxDB."""
-    if delay:
-        time.sleep(float(delay))
+    if chunk_delay:
+        time.sleep(float(chunk_delay))
 
     data = ''.join(lines)
     params = {'db': db}
@@ -165,7 +165,7 @@ def write_points(db, retention, lines, delay):
     sys.exit(-1)
 
 
-def restore(db, measurements, from_measurement, retention, delay):
+def restore(db, measurements, from_measurement, retention, chunk_delay, measurement_delay):
     """Restore from a backup."""
     if not os.path.exists(DIR):
         print 'Backup dir "%s" does not exist' % DIR
@@ -182,18 +182,21 @@ def restore(db, measurements, from_measurement, retention, delay):
         sys.exit()
     print
     for m in measurements:
+        if m != measurements[0] and measurement_delay:
+            time.sleep(float(measurement_delay))
+
         print 'Loading %s...' % m,
         lines = []
         line_count = 0
         for l in open('%s/%s' % (DIR, m), 'r'):
             if len(lines) == WRITE_CHUNK_SIZE:
-                write_points(db, retention, lines, delay)
+                write_points(db, retention, lines, chunk_delay)
                 lines = []
                 line_count += WRITE_CHUNK_SIZE
             lines.append(l)
 
         if lines:
-            write_points(db, retention, lines, delay)
+            write_points(db, retention, lines, chunk_delay)
         print line_count+len(lines)
 
 
@@ -225,7 +228,8 @@ if __name__ == '__main__':
     parser.add_argument('--restore', action='store_true', help='restore from a backup')
     parser.add_argument('--restore-db', help='database target of restore')
     parser.add_argument('--restore-rp', help='retention to restore to')
-    parser.add_argument('--restore-delay', help='restore delay in sec or subsec between chunks of %d points' % WRITE_CHUNK_SIZE)
+    parser.add_argument('--restore-chunk-delay', help='restore delay in sec or subsec between chunks of %d points' % WRITE_CHUNK_SIZE)
+    parser.add_argument('--restore-measurement-delay', help='restore delay in sec or subsec between measurements')
     args = parser.parse_args()
 
     if 'REQUESTS_CA_BUNDLE' not in os.environ:
@@ -275,7 +279,7 @@ if __name__ == '__main__':
 
         print '>> %s' % now()
         print 'Starting restore from "%s" dir to "%s" db.\n' % (DIR, args.restore_db)
-        restore(args.restore_db, args.measurements, args.from_measurement, args.restore_rp, args.restore_delay)
+        restore(args.restore_db, args.measurements, args.from_measurement, args.restore_rp, args.restore_chunk_delay, args.restore_measurement_delay)
         print 'Done.'
         print '<< %s' % now()
 
