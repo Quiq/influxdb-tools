@@ -171,6 +171,7 @@ def restore(db, measurements, from_measurement, retention, chunk_delay, measurem
 
     if not measurements:
         files = os.listdir(DIR)
+        files.sort()
         measurements = filter_measurements(files, from_measurement)
     print 'Files:'
     print measurements
