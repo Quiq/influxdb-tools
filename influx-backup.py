@@ -66,22 +66,20 @@ def format_rows(m, msfields, data):
                 for i in xrange(len(b['columns'])):
                     col = b['columns'][i]
                     val = c[i]
-                    if val is None:
-                        val = ''
-                    elif type(val) in [unicode, str]:
-                        val = val.replace(' ', '\ ')
+                    if val is None or val == '':
+                        continue
 
                     if col == 'time':
                         timestamp = val
-                        continue
-                    if col in msfields.keys():
+                    elif col in msfields.keys():
                         # Add double-quotes only for strings.
                         if msfields[col] == 'string':
                             val = '"%s"' % val
                         fields.append('%s=%s' % (col, val))
-                        continue
-
-                    tags.append('%s=%s' % (col, val))
+                    else:
+                        if type(val) in [unicode, str]:
+                            val = val.replace(' ', '\ ')
+                        tags.append('%s=%s' % (col, val))
 
                 if timestamp == 0 or len(fields) == 0:
                     print 'No "time" column or 0 fields for "%s": time %s, fields %s' % (m, timestamp, fields)
