@@ -18,13 +18,13 @@ Requires python `2.7` and `requests` module.
 
 ### Usage
 ```
-$ ./influx-backup.py -h
 usage: influx-backup.py [-h] --url URL --user USER --dir DIR
                         [--measurements MEASUREMENTS]
                         [--from-measurement FROM_MEASUREMENT] [--dump]
                         [--dump-db DUMP_DB] [--dump-since DUMP_SINCE]
                         [--dump-until DUMP_UNTIL] [--restore]
-                        [--restore-db RESTORE_DB]
+                        [--restore-db RESTORE_DB] [--restore-rp RESTORE_RP]
+                        [--restore-delay RESTORE_DELAY]
 
 InfluxDB backup script
 
@@ -48,6 +48,11 @@ optional arguments:
   --restore             restore from a backup
   --restore-db RESTORE_DB
                         database target of restore
+  --restore-rp RESTORE_RP
+                        retention to restore to
+  --restore-delay RESTORE_DELAY
+                        restore delay in sec or subsec between chunks of 5000
+                        points
 ```
 
 ### Examples
