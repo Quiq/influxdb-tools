@@ -74,11 +74,14 @@ def format_rows(m, msfields, data):
                     elif col in msfields.keys():
                         # Add double-quotes only for strings.
                         if msfields[col] == 'string':
+                            val = val.replace('"', '\"')
                             val = '"%s"' % val
+                        elif msfields[col] == 'integer':
+                            val = '%si' % val
                         fields.append('%s=%s' % (col, val))
                     else:
                         if type(val) in [unicode, str]:
-                            val = val.replace(' ', '\ ')
+                            val = val.replace(' ', '\ ').replace(',', '\,').replace('=', '\=')
                         tags.append('%s=%s' % (col, val))
 
                 if timestamp == 0 or len(fields) == 0:
