@@ -12,17 +12,22 @@ InfluxDB backup/restore script using HTTP API and line-protocol format.
 * Backup/restore individual measurements
 * Incremental backups using "since", "until" arguments
 * Delayed restore
+* Gzip support for backup/restore process
 
-Tested on InfluxDB version `1.3.5`.
+Requires Python `3.5+` and `requests` module. Tested on InfluxDB `1.3.6`.
 
-Requires python `2.7` and `requests` module.
+InfluxDB HTTP API allows to dump only the default retention of your databases.
+However, you can restore a backup to any retention.
+
+It is recommended to do a delayed restore using `--restore-chunk-delay`, `--restore-measurement-delay`
+so your InfluxDB instance does not run out of memory or IO pretty fast.
 
 ### Usage
 ```
 usage: influx-backup.py [-h] --url URL --user USER --dir DIR
                         [--measurements MEASUREMENTS]
-                        [--from-measurement FROM_MEASUREMENT] [--dump]
-                        [--dump-db DUMP_DB] [--dump-since DUMP_SINCE]
+                        [--from-measurement FROM_MEASUREMENT] [--gzip]
+                        [--dump] [--dump-db DUMP_DB] [--dump-since DUMP_SINCE]
                         [--dump-until DUMP_UNTIL] [--restore]
                         [--restore-db RESTORE_DB] [--restore-rp RESTORE_RP]
                         [--restore-chunk-delay RESTORE_CHUNK_DELAY]
@@ -41,12 +46,14 @@ optional arguments:
   --from-measurement FROM_MEASUREMENT
                         dump/restore from this measurement and on (ignored
                         when using --measurements)
+  --gzip                dump/restore into/from gzipped files automatically
   --dump                create a backup
   --dump-db DUMP_DB     database to dump
   --dump-since DUMP_SINCE
-                        start date in the format YYYY-MM-DD
+                        start date in the format YYYY-MM-DD (starting
+                        00:00:00)
   --dump-until DUMP_UNTIL
-                        end date in the format YYYY-MM-DD
+                        end date in the format YYYY-MM-DD (exclusive)
   --restore             restore from a backup
   --restore-db RESTORE_DB
                         database target of restore
@@ -88,3 +95,23 @@ Restore only `heartbeat` measurement from `stats` dir into `stats_new` db:
 Create continuous queries for InfluxDB according to the list of metrics.
 
 [Work in progess]
+
+## Usage
+```
+usage: influx-cq.py [-h] [--host HOST] [--port PORT] [--user USER]
+                    [--pass PASS] [--prom-db PROM_DB] [--trend-db TREND_DB]
+                    [--drop-trend-db] [--exit-on-cq]
+
+Script for creating CQ queries on InfluxDB
+
+optional arguments:
+  -h, --help           show this help message and exit
+  --host HOST          InfluxDB host
+  --port PORT          InfluxDB port
+  --user USER          InfluxDB username
+  --pass PASS          InfluxDB password
+  --prom-db PROM_DB    InfluxDB db with raw prometheus data
+  --trend-db TREND_DB  InfluxDB db for trending data
+  --drop-trend-db      Drop trending db
+  --exit-on-cq         Exit when any continuous queries exist
+```
