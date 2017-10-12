@@ -78,7 +78,7 @@ def format_rows(m, msfields, data):
                     elif col in msfields.keys():
                         # Add double-quotes only for strings.
                         if msfields[col] == 'string':
-                            val = val.replace('"', '\"')
+                            val = val.replace('"', '\\"')
                             val = '"%s"' % val
                         elif msfields[col] == 'integer':
                             val = '%si' % val
@@ -95,8 +95,6 @@ def format_rows(m, msfields, data):
                 # Format: agent_status,agent=foo\ bar,tenant=roman duration_in_old_status=1207920,new_status="offline",old_status="available" 1496310265009000000
                 rows.append('%s,%s %s %s\n' % (m, ','.join(tags), ','.join(fields), timestamp))
 
-    if GZIP:
-        rows = [r.encode() for r in rows]
     return rows
 
 
@@ -139,7 +137,7 @@ def dump(db, where):
             continue
         print('Dumping %s...' % m, end='')
         if GZIP:
-            f = gzip.open('%s/%s.gz' % (DIR, m), 'wb')
+            f = gzip.open('%s/%s.gz' % (DIR, m), 'wt')
         else:
             f = open('%s/%s' % (DIR, m), 'w')
         line_count = 0
@@ -211,7 +209,7 @@ def restore(db, retention, chunk_delay, measurement_delay):
         lines = []
         line_count = 0
         if GZIP:
-            f = gzip.open('%s/%s.gz' % (DIR, m), 'rb')
+            f = gzip.open('%s/%s.gz' % (DIR, m), 'rt')
         else:
             f = open('%s/%s' % (DIR, m), 'r')
         for l in f:
@@ -219,8 +217,6 @@ def restore(db, retention, chunk_delay, measurement_delay):
                 write_points(db, retention, lines, chunk_delay)
                 lines = []
                 line_count += WRITE_CHUNK_SIZE
-            if GZIP:
-                l = l.decode()
             lines.append(l)
 
         if lines:
