@@ -103,8 +103,9 @@ def dump(db, where):
     measurements = MEASUREMENTS
     if not measurements:
         data = query_influxdb({'q': 'SHOW MEASUREMENTS', 'db': db})
-        measurements = [i[0] for i in data['results'][0]['series'][0]['values']]
-        measurements = filter_measurements(measurements)
+        if 'series' in data['results'][0]:
+            measurements = [i[0] for i in data['results'][0]['series'][0]['values']]
+            measurements = filter_measurements(measurements)
 
     print('Measurements:')
     print(measurements)
