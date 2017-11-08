@@ -24,10 +24,11 @@ so your InfluxDB instance does not run out of memory or IO pretty fast.
 ```
 usage: influx-backup.py [-h] --url URL --user USER --dir DIR
                         [--measurements MEASUREMENTS]
-                        [--from-measurement FROM_MEASUREMENT] [--gzip]
-                        [--dump] [--dump-db DUMP_DB] [--dump-since DUMP_SINCE]
+                        [--from-measurement FROM_MEASUREMENT]
+                        [--retention RETENTION] [--gzip] [--dump]
+                        [--dump-db DUMP_DB] [--dump-since DUMP_SINCE]
                         [--dump-until DUMP_UNTIL] [--restore]
-                        [--restore-db RESTORE_DB] [--restore-rp RESTORE_RP]
+                        [--restore-db RESTORE_DB]
                         [--restore-chunk-delay RESTORE_CHUNK_DELAY]
                         [--restore-measurement-delay RESTORE_MEASUREMENT_DELAY]
 
@@ -44,6 +45,8 @@ optional arguments:
   --from-measurement FROM_MEASUREMENT
                         dump/restore from this measurement and on (ignored
                         when using --measurements)
+  --retention RETENTION
+                        retention to dump/restore
   --gzip                dump/restore into/from gzipped files automatically
   --dump                create a backup
   --dump-db DUMP_DB     database to dump
@@ -55,8 +58,6 @@ optional arguments:
   --restore             restore from a backup
   --restore-db RESTORE_DB
                         database target of restore
-  --restore-rp RESTORE_RP
-                        retention to restore to
   --restore-chunk-delay RESTORE_CHUNK_DELAY
                         restore delay in sec or subsec between chunks of 5000
                         points
