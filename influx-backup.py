@@ -145,8 +145,14 @@ def dump(db, where):
             f = gzip.open('%s/%s.gz' % (DIR, m), 'wt')
         else:
             f = open('%s/%s' % (DIR, m), 'w')
+
+        if RETENTION:
+            query = 'SELECT * FROM "%s"."%s"."%s" %s' % (db, RETENTION, m, where)
+        else:
+            query = 'SELECT * FROM "%s" %s' % (m, where)
+
         line_count = 0
-        for data in chunked_read(db, 'SELECT * FROM "%s" %s' % (m, where)):
+        for data in chunked_read(db, query):
             rows = format_rows(m, msfields[m], data)
             f.writelines(rows)
             line_count += len(rows)
@@ -155,15 +161,15 @@ def dump(db, where):
         f.close()
 
 
-def write_points(db, retention, lines, chunk_delay):
+def write_points(db, lines, chunk_delay):
     """Write points to InfluxDB."""
     if chunk_delay:
         time.sleep(float(chunk_delay))
 
     data = ''.join(lines)
     params = {'db': db}
-    if retention:
-        params['rp'] = retention
+    if RETENTION:
+        params['rp'] = RETENTION
     last_error = ''
     retries = 10
     while retries > 0:
@@ -181,7 +187,7 @@ def write_points(db, retention, lines, chunk_delay):
     sys.exit(-1)
 
 
-def restore(db, retention, chunk_delay, measurement_delay):
+def restore(db, chunk_delay, measurement_delay):
     """Restore from a backup."""
     if not os.path.exists(DIR):
         print('Backup dir "%s" does not exist' % DIR)
@@ -219,13 +225,13 @@ def restore(db, retention, chunk_delay, measurement_delay):
             f = open('%s/%s' % (DIR, m), 'r')
         for l in f:
             if len(lines) == WRITE_CHUNK_SIZE:
-                write_points(db, retention, lines, chunk_delay)
+                write_points(db, lines, chunk_delay)
                 lines = []
                 line_count += WRITE_CHUNK_SIZE
             lines.append(l)
 
         if lines:
-            write_points(db, retention, lines, chunk_delay)
+            write_points(db, lines, chunk_delay)
         print(line_count+len(lines))
         f.close()
 
@@ -251,6 +257,7 @@ if __name__ == '__main__':
     parser.add_argument('--dir', required=True, help='directory name for backup or restore form')
     parser.add_argument('--measurements', help='comma-separated list of measurements to dump/restore')
     parser.add_argument('--from-measurement', help='dump/restore from this measurement and on (ignored when using --measurements)')
+    parser.add_argument('--retention', help='retention to dump/restore')
     parser.add_argument('--gzip', action='store_true', help='dump/restore into/from gzipped files automatically')
     parser.add_argument('--dump', action='store_true', help='create a backup')
     parser.add_argument('--dump-db', help='database to dump')
@@ -258,7 +265,6 @@ if __name__ == '__main__':
     parser.add_argument('--dump-until', help='end date in the format YYYY-MM-DD (exclusive)')
     parser.add_argument('--restore', action='store_true', help='restore from a backup')
     parser.add_argument('--restore-db', help='database target of restore')
-    parser.add_argument('--restore-rp', help='retention to restore to')
     parser.add_argument('--restore-chunk-delay', help='restore delay in sec or subsec between chunks of %d points' % WRITE_CHUNK_SIZE)
     parser.add_argument('--restore-measurement-delay', help='restore delay in sec or subsec between measurements')
     args = parser.parse_args()
@@ -273,6 +279,7 @@ if __name__ == '__main__':
     AUTH = (args.user, password)
     DIR = args.dir
     GZIP = args.gzip
+    RETENTION = args.retention
     FROM_MEASUREMENT = args.from_measurement
     MEASUREMENTS = args.measurements
     if MEASUREMENTS:
@@ -287,21 +294,21 @@ if __name__ == '__main__':
             parser.print_help()
             sys.exit(-1)
 
-        where = ''
+        WHERE = ''
         if args.dump_since and args.dump_until:
             validate_date(args.dump_since)
             validate_date(args.dump_until)
-            where = "WHERE time >= '%s' AND time < '%s'" % (args.dump_since, args.dump_until)
+            WHERE = "WHERE time >= '%s' AND time < '%s'" % (args.dump_since, args.dump_until)
         elif args.dump_since:
             validate_date(args.dump_since)
-            where = "WHERE time >= '%s'" % args.dump_since
+            WHERE = "WHERE time >= '%s'" % args.dump_since
         elif args.dump_until:
             validate_date(args.dump_until)
-            where = "WHERE time < '%s'" % args.dump_until
+            WHERE = "WHERE time < '%s'" % args.dump_until
 
         print('>> %s' % now())
-        print('Starting backup of "%s" db to "%s" dir %s\n' % (args.dump_db, DIR, where))
-        dump(args.dump_db, where)
+        print('Starting backup of "%s" db to "%s" dir %s\n' % (args.dump_db, DIR, WHERE))
+        dump(args.dump_db, WHERE)
         print('Done.')
         print('<< %s' % now())
 
@@ -313,7 +320,7 @@ if __name__ == '__main__':
 
         print('>> %s' % now())
         print('Starting restore from "%s" dir to "%s" db.\n' % (DIR, args.restore_db))
-        restore(args.restore_db, args.restore_rp, args.restore_chunk_delay, args.restore_measurement_delay)
+        restore(args.restore_db, args.restore_chunk_delay, args.restore_measurement_delay)
         print('Done.')
         print('<< %s' % now())
 

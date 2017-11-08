@@ -10,14 +10,12 @@ InfluxDB backup/restore script using HTTP API and line-protocol format.
 * Chunked read/write
 * Separate file for each measurement
 * Backup/restore individual measurements
+* Backup/restore specific retention
 * Incremental backups using "since", "until" arguments
 * Delayed restore
 * Gzip support for backup/restore process
 
 Requires Python `3.5+` and `requests` module. Tested on InfluxDB `1.3.6`.
-
-InfluxDB HTTP API allows to dump only the default retention of your databases.
-However, you can restore a backup to any retention.
 
 It is recommended to do a delayed restore using `--restore-chunk-delay`, `--restore-measurement-delay`
 so your InfluxDB instance does not run out of memory or IO pretty fast.
