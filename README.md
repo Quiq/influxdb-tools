@@ -11,7 +11,7 @@ InfluxDB backup/restore script using HTTP API and line-protocol format.
 * Separate file for each measurement
 * Backup/restore individual measurements
 * Backup/restore specific retention
-* Incremental backups using "since", "until" arguments
+* Incremental backups using "since", "until" date/time arguments
 * Delayed restore
 * Gzip support for backup/restore process
 
@@ -52,9 +52,10 @@ optional arguments:
   --dump-db DUMP_DB     database to dump
   --dump-since DUMP_SINCE
                         start date in the format YYYY-MM-DD (starting
-                        00:00:00)
+                        00:00:00) or YYYY-MM-DDTHH:MM:SSZ
   --dump-until DUMP_UNTIL
                         end date in the format YYYY-MM-DD (exclusive)
+                        or YYYY-MM-DDTHH:MM:SSZ
   --restore             restore from a backup
   --restore-db RESTORE_DB
                         database target of restore

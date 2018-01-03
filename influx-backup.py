@@ -239,7 +239,12 @@ def restore(db, chunk_delay, measurement_delay):
 def validate_date(date_str):
     """Validate date format."""
     try:
-        datetime.datetime.strptime(date_str, '%Y-%m-%d')
+        return datetime.datetime.strptime(date_str, '%Y-%m-%d')
+    except ValueError:
+        pass
+
+    try:
+        datetime.datetime.strptime(date_str, '%Y-%m-%dT%H:%M:%SZ')
     except ValueError as err:
         print(err)
         sys.exit(-1)
@@ -261,8 +266,8 @@ if __name__ == '__main__':
     parser.add_argument('--gzip', action='store_true', help='dump/restore into/from gzipped files automatically')
     parser.add_argument('--dump', action='store_true', help='create a backup')
     parser.add_argument('--dump-db', help='database to dump')
-    parser.add_argument('--dump-since', help='start date in the format YYYY-MM-DD (starting 00:00:00)')
-    parser.add_argument('--dump-until', help='end date in the format YYYY-MM-DD (exclusive)')
+    parser.add_argument('--dump-since', help='start date in the format YYYY-MM-DD (starting 00:00:00) or YYYY-MM-DDTHH:MM:SSZ')
+    parser.add_argument('--dump-until', help='end date in the format YYYY-MM-DD (exclusive) or YYYY-MM-DDTHH:MM:SSZ')
     parser.add_argument('--restore', action='store_true', help='restore from a backup')
     parser.add_argument('--restore-db', help='database target of restore')
     parser.add_argument('--restore-chunk-delay', help='restore delay in sec or subsec between chunks of %d points' % WRITE_CHUNK_SIZE)
