@@ -177,7 +177,10 @@ def write_points(db, lines, chunk_delay):
             r = requests.post(URL+'/write', auth=AUTH, params=params, data=data)
             if r.status_code == 204:
                 return
-            last_error = ' %s HTTP error' % r.status_code
+            """InfluxDB is able to skip point beyond rp you write to"""
+            if 'points beyond retention policy' in r.text:
+                return
+            last_error = ' %s HTTP error, %s' % (r.status_code, r.text)
         except:
             last_error = sys.exc_info()[0]
         retries -= 1
