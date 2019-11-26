@@ -36,20 +36,24 @@ def filter_measurements(measurements):
     for m in measurements:
         if m == FROM_MEASUREMENT:
             return measurements[i:]
+
         i += 1
+
     # Return nothing if FROM_MEASUREMENT was given and not matched above.
     if FROM_MEASUREMENT:
         return []
+
     return measurements
 
 
 def chunked_read(db, query):
     """Chunked request to InfluxDB."""
     r = requests.get(URL+'/query', auth=AUTH, stream=True,
-            params={'q': query, 'db': db, 'epoch': 'ns', 'chunked': 'true', 'chunk_size': READ_CHUCK_SIZE})
+                     params={'q': query, 'db': db, 'epoch': 'ns', 'chunked': 'true', 'chunk_size': READ_CHUCK_SIZE})
     if r.status_code != 200:
         print(r.status_code, r.text)
         sys.exit(-1)
+
     # r.iter_lines() is an iterator where 1 line contains 1 chunk of data coming from InfluxDB.
     return r.iter_lines()
 
@@ -62,6 +66,7 @@ def format_rows(m, msfields, data):
     for a in data['results']:
         if 'series' not in a:
             break
+
         for b in a['series']:
             for c in b['values']:
                 timestamp = 0
@@ -79,21 +84,23 @@ def format_rows(m, msfields, data):
                         # Add double-quotes only for strings.
                         if msfields[col] == 'string':
                             val = val.replace('"', '\\"')
-                            val = '"%s"' % val
+                            val = f'"{val}"'
                         elif msfields[col] == 'integer':
-                            val = '%si' % val
-                        fields.append('%s=%s' % (col, val))
+                            val = f'{val}i'
+
+                        fields.append(f'{col}={val}')
                     else:
                         if type(val) == str:
                             val = val.replace(' ', '\ ').replace(',', '\,').replace('=', '\=')
-                        tags.append('%s=%s' % (col, val))
+
+                        tags.append(f'{col}={val}')
 
                 if timestamp == 0 or len(fields) == 0:
-                    print('No "time" column or 0 fields for "%s": time %s, fields %s' % (m, timestamp, fields))
+                    print(f'No "time" column or 0 fields for "{m}": time {timestamp}, fields {fields}')
                     sys.exit(-1)
 
                 # Format: agent_status,agent=foo\ bar,tenant=roman duration_in_old_status=1207920,new_status="offline",old_status="available" 1496310265009000000
-                rows.append('%s,%s %s %s\n' % (m, ','.join(tags), ','.join(fields), timestamp))
+                rows.append(f"{m},{','.join(tags)} {','.join(fields)} {timestamp}\n")
 
     return rows
 
@@ -118,13 +125,15 @@ def dump(db, where):
     # Get measurement fields.
     queries = []
     for m in measurements:
-        queries.append('SHOW FIELD KEYS FROM "%s"' % m)
+        queries.append(f'SHOW FIELD KEYS FROM "{m}"')
+
     data = query_influxdb(params={'q': ';'.join(queries), 'db': db})
     msfields = {}
     for i in data['results']:
         # Empty measurement has no fields.
         if 'series' not in i:
             continue
+
         msfields[i['series'][0]['name']] = {x[0]: x[1] for x in i['series'][0]['values']}
 
     print('Measurement fields:')
@@ -138,18 +147,19 @@ def dump(db, where):
     for m in measurements:
         if m not in msfields:
             # Empty measurement.
-            print('Ignoring %s... 0' % m)
+            print(f'Ignoring {m}... 0')
             continue
-        print('Dumping %s...' % m, end='')
+
+        print(f'Dumping {m}...', end='')
         if GZIP:
-            f = gzip.open('%s/%s.gz' % (DIR, m), 'wt')
+            f = gzip.open(f'{DIR}/{m}.gz', 'wt')
         else:
-            f = open('%s/%s' % (DIR, m), 'w')
+            f = open(f'{DIR}/{m}', 'w')
 
         if RETENTION:
-            query = 'SELECT * FROM "%s"."%s"."%s" %s' % (db, RETENTION, m, where)
+            query = f'SELECT * FROM "{db}"."{RETENTION}"."{m}" {where}'
         else:
-            query = 'SELECT * FROM "%s" %s' % (m, where)
+            query = f'SELECT * FROM "{m}" {where}'
 
         line_count = 0
         for data in chunked_read(db, query):
@@ -161,15 +171,16 @@ def dump(db, where):
         f.close()
 
 
-def write_points(db, lines, chunk_delay):
+def write_points(db, lines, chunk_delay, precision):
     """Write points to InfluxDB."""
     if chunk_delay:
         time.sleep(float(chunk_delay))
 
     data = ''.join(lines)
-    params = {'db': db}
+    params = {'db': db, 'precision': precision}
     if RETENTION:
         params['rp'] = RETENTION
+
     last_error = ''
     retries = 10
     while retries > 0:
@@ -177,12 +188,15 @@ def write_points(db, lines, chunk_delay):
             r = requests.post(URL+'/write', auth=AUTH, params=params, data=data)
             if r.status_code == 204:
                 return
-            """InfluxDB is able to skip point beyond rp you write to"""
+
+            # InfluxDB is able to skip point beyond rp you write to
             if 'points beyond retention policy' in r.text:
                 return
-            last_error = ' %s HTTP error, %s' % (r.status_code, r.text)
+
+            last_error = f' {r.status_code} HTTP error, {r.text}'
         except:
             last_error = sys.exc_info()[0]
+
         retries -= 1
         time.sleep(1)
 
@@ -190,10 +204,10 @@ def write_points(db, lines, chunk_delay):
     sys.exit(-1)
 
 
-def restore(db, chunk_delay, measurement_delay):
+def restore(db, chunk_delay, measurement_delay, precision):
     """Restore from a backup."""
     if not os.path.exists(DIR):
-        print('Backup dir "%s" does not exist' % DIR)
+        print(f'Backup dir "{DIR}" does not exist')
         sys.exit(-1)
 
     measurements = MEASUREMENTS
@@ -202,39 +216,61 @@ def restore(db, chunk_delay, measurement_delay):
             files = [f[:-3] for f in os.listdir(DIR) if os.path.isfile(DIR+'/'+f) and f.endswith('.gz')]
         else:
             files = [f for f in os.listdir(DIR) if os.path.isfile(DIR+'/'+f) and not f.endswith('.gz')]
+
         files.sort()
         measurements = filter_measurements(files)
 
     if not measurements:
         print('Nothing to restore. If backup is gzipped, use --gzip option.')
         sys.exit(-1)
+
     print('Files:')
     print(measurements)
     print()
 
-    if input('> Confirm restore into "%s" db? [yes/no] ' % db) != 'yes':
+    # Sanity check of timestamp precision.
+    with open(f'{DIR}/{measurements[0]}', 'r') as f:
+        ts = len(f.readline().split()[-1])
+        conditions = any([
+            ts == 10 and precision != 's',
+            ts == 13 and precision != 'ms',
+            ts == 16 and precision != 'u',
+            ts == 19 and precision != 'ns'
+        ])
+        if conditions:
+            print('*** WARNING ***')
+            print('Please check the precision. You may need to specify --restore-precision argument.')
+            print(f'First line of the first file contains timestamp with length of {ts} while precision argument is set to "{precision}".')
+            print('Generally, it is 10 for s, 13 for ms, 16 for u, 19 for ns.')
+            print()
+
+    if input(f'> Confirm restore into "{db}" db? [yes/no] ') != 'yes':
         sys.exit()
+
     print()
     for m in measurements:
         if m != measurements[0] and measurement_delay:
             time.sleep(float(measurement_delay))
 
-        print('Loading %s...' % m, end='')
+        print(f'Loading {m}...', end='')
         lines = []
         line_count = 0
         if GZIP:
-            f = gzip.open('%s/%s.gz' % (DIR, m), 'rt')
+            f = gzip.open(f'{DIR}/{m}.gz', 'rt')
         else:
-            f = open('%s/%s' % (DIR, m), 'r')
+            f = open(f'{DIR}/{m}', 'r')
+
         for l in f:
             if len(lines) == WRITE_CHUNK_SIZE:
-                write_points(db, lines, chunk_delay)
+                write_points(db, lines, chunk_delay, precision)
                 lines = []
                 line_count += WRITE_CHUNK_SIZE
+
             lines.append(l)
 
         if lines:
-            write_points(db, lines, chunk_delay)
+            write_points(db, lines, chunk_delay, precision)
+
         print(line_count+len(lines))
         f.close()
 
@@ -273,6 +309,7 @@ if __name__ == '__main__':
     parser.add_argument('--dump-until', help='end date in the format YYYY-MM-DD (exclusive) or YYYY-MM-DDTHH:MM:SSZ')
     parser.add_argument('--restore', action='store_true', help='restore from a backup')
     parser.add_argument('--restore-db', help='database target of restore')
+    parser.add_argument('--restore-precision', help='restore precision: ns,u,ms,s,m,h. Default: ns', default='ns')
     parser.add_argument('--restore-chunk-delay', help='restore delay in sec or subsec between chunks of %d points' % WRITE_CHUNK_SIZE)
     parser.add_argument('--restore-measurement-delay', help='restore delay in sec or subsec between measurements')
     args = parser.parse_args()
@@ -284,6 +321,7 @@ if __name__ == '__main__':
     password = os.getenv('INFLUX_PW')
     if not password:
         password = getpass.getpass()
+
     AUTH = (args.user, password)
     DIR = args.dir
     GZIP = args.gzip
@@ -306,19 +344,19 @@ if __name__ == '__main__':
         if args.dump_since and args.dump_until:
             validate_date(args.dump_since)
             validate_date(args.dump_until)
-            WHERE = "WHERE time >= '%s' AND time < '%s'" % (args.dump_since, args.dump_until)
+            WHERE = f"WHERE time >= '{args.dump_since}' AND time < '{args.dump_until}'"
         elif args.dump_since:
             validate_date(args.dump_since)
-            WHERE = "WHERE time >= '%s'" % args.dump_since
+            WHERE = f"WHERE time >= '{args.dump_since}'"
         elif args.dump_until:
             validate_date(args.dump_until)
-            WHERE = "WHERE time < '%s'" % args.dump_until
+            WHERE = f"WHERE time < '{args.dump_until}'"
 
-        print('>> %s' % now())
-        print('Starting backup of "%s" db to "%s" dir %s\n' % (args.dump_db, DIR, WHERE))
+        print(f'>> {now()}')
+        print(f'Starting backup of "{args.dump_db}" db to "{DIR}" dir {WHERE}\n')
         dump(args.dump_db, WHERE)
         print('Done.')
-        print('<< %s' % now())
+        print(f'<< {now()}')
 
     elif args.restore:
         if args.restore_db is None:
@@ -326,11 +364,15 @@ if __name__ == '__main__':
             parser.print_help()
             sys.exit(-1)
 
-        print('>> %s' % now())
-        print('Starting restore from "%s" dir to "%s" db.\n' % (DIR, args.restore_db))
-        restore(args.restore_db, args.restore_chunk_delay, args.restore_measurement_delay)
+        if args.restore_precision not in ['ns', 'u', 'ms', 's', 'm', 'h']:
+            print('--restore-precision should be one of ns,u,ms,s,m,h')
+            sys.exit(-1)
+
+        print(f'<< {now()}')
+        print(f'Starting restore from "{DIR}" dir to "{args.restore_db}" db.\n')
+        restore(args.restore_db, args.restore_chunk_delay, args.restore_measurement_delay, args.restore_precision)
         print('Done.')
-        print('<< %s' % now())
+        print(f'<< {now()}')
 
     else:
         parser.print_help()
