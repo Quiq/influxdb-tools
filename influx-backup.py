@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
+"""InfluxDB backup/restore script using HTTP API and line-protocol format.
 
-"""InfluxDB backup/restore script using HTTP API and line-protocol format."""
+Requires python 3.6+
+"""
 
 import argparse
 import datetime
@@ -60,8 +62,6 @@ def chunked_read(db, query):
 
 def format_rows(m, msfields, data):
     """Parse response from InfluxDB and format rows to write into the backup file."""
-    # XXX .decode() is needed for python 3.5 as json.loads() supports bytes only starting 3.6.
-    data = json.loads(data.decode())
     rows = []
     for a in data['results']:
         if 'series' not in a:
@@ -150,7 +150,7 @@ def dump(db, where):
             print(f'Ignoring {m}... 0')
             continue
 
-        print(f'Dumping {m}...', end='')
+        print(f'Dumping {m}... ', end='')
         if GZIP:
             f = gzip.open(f'{DIR}/{m}.gz', 'wt')
         else:
@@ -163,9 +163,14 @@ def dump(db, where):
 
         line_count = 0
         for data in chunked_read(db, query):
+            data = json.loads(data)
             rows = format_rows(m, msfields[m], data)
             f.writelines(rows)
             line_count += len(rows)
+            if len(rows) == 0 and 'error' in data['results'][0]:
+                # Possible error.
+                print('ERROR', data['results'][0]['error'])
+                sys.exit(-1)
 
         print(line_count)
         f.close()
@@ -252,7 +257,7 @@ def restore(db, chunk_delay, measurement_delay, precision):
         if m != measurements[0] and measurement_delay:
             time.sleep(float(measurement_delay))
 
-        print(f'Loading {m}...', end='')
+        print(f'Loading {m}... ', end='')
         lines = []
         line_count = 0
         if GZIP:
