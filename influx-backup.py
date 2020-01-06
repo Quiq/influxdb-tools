@@ -34,6 +34,14 @@ def query_influxdb(params):
 
 def filter_measurements(measurements):
     """Filter measurement list."""
+    if IGNORE_MEASUREMENTS:
+        new_list = []
+        for m in measurements:
+            if m not in IGNORE_MEASUREMENTS:
+                new_list.append(m)
+
+        measurements = new_list
+
     i = 0
     for m in measurements:
         if m == FROM_MEASUREMENT:
@@ -305,6 +313,7 @@ if __name__ == '__main__':
     parser.add_argument('--user', required=True, help='InfluxDB username. Password must be set as env var INFLUX_PW, otherwise will be asked.')
     parser.add_argument('--dir', required=True, help='directory name for backup or restore form')
     parser.add_argument('--measurements', help='comma-separated list of measurements to dump/restore')
+    parser.add_argument('--ignore-measurements', help='comma-separated list of measurements to skip from dump/restore (ignored when using --measurements)')
     parser.add_argument('--from-measurement', help='dump/restore from this measurement and on (ignored when using --measurements)')
     parser.add_argument('--retention', help='retention to dump/restore')
     parser.add_argument('--gzip', action='store_true', help='dump/restore into/from gzipped files automatically')
@@ -335,6 +344,10 @@ if __name__ == '__main__':
     MEASUREMENTS = args.measurements
     if MEASUREMENTS:
         MEASUREMENTS = MEASUREMENTS.split(',')
+
+    IGNORE_MEASUREMENTS = args.ignore_measurements
+    if IGNORE_MEASUREMENTS:
+        IGNORE_MEASUREMENTS = IGNORE_MEASUREMENTS.split(',')
 
     # Enable unbuffered output.
     print = functools.partial(print, flush=True)
