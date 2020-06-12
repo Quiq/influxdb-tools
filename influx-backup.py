@@ -133,7 +133,10 @@ def dump(db, where):
     # Get measurement fields.
     queries = []
     for m in measurements:
-        queries.append(f'SHOW FIELD KEYS FROM "{m}"')
+        if RETENTION:
+            queries.append(f'SHOW FIELD KEYS FROM "{db}"."{RETENTION}"."{m}"')
+        else:
+            queries.append(f'SHOW FIELD KEYS FROM "{m}"')
 
     data = query_influxdb(params={'q': ';'.join(queries), 'db': db})
     msfields = {}
@@ -207,7 +210,7 @@ def write_points(db, lines, chunk_delay, precision):
                 return
 
             last_error = f' {r.status_code} HTTP error, {r.text}'
-        except:
+        except Exception:
             last_error = sys.exc_info()[0]
 
         retries -= 1
@@ -273,13 +276,13 @@ def restore(db, chunk_delay, measurement_delay, precision):
         else:
             f = open(f'{DIR}/{m}', 'r')
 
-        for l in f:
+        for i in f:
             if len(lines) == WRITE_CHUNK_SIZE:
                 write_points(db, lines, chunk_delay, precision)
                 lines = []
                 line_count += WRITE_CHUNK_SIZE
 
-            lines.append(l)
+            lines.append(i)
 
         if lines:
             write_points(db, lines, chunk_delay, precision)
