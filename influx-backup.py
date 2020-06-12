@@ -245,20 +245,25 @@ def restore(db, chunk_delay, measurement_delay, precision):
     print()
 
     # Sanity check of timestamp precision.
-    with open(f'{DIR}/{measurements[0]}', 'r') as f:
-        ts = len(f.readline().split()[-1])
-        conditions = any([
-            ts == 10 and precision != 's',
-            ts == 13 and precision != 'ms',
-            ts == 16 and precision != 'u',
-            ts == 19 and precision != 'ns'
-        ])
-        if conditions:
-            print('*** WARNING ***')
-            print('Please check the precision. You may need to specify --restore-precision argument.')
-            print(f'First line of the first file contains timestamp with length of {ts} while precision argument is set to "{precision}".')
-            print('Generally, it is 10 for s, 13 for ms, 16 for u, 19 for ns.')
-            print()
+    if GZIP:
+        f = gzip.open(f'{DIR}/{measurements[0]}.gz', 'rt')
+    else:
+        f = open(f'{DIR}/{measurements[0]}', 'r')
+
+    ts = len(f.readline().split()[-1])
+    f.close()
+    conditions = any([
+        ts == 10 and precision != 's',
+        ts == 13 and precision != 'ms',
+        ts == 16 and precision != 'u',
+        ts == 19 and precision != 'ns'
+    ])
+    if conditions:
+        print('*** WARNING ***')
+        print('Please check the precision. You may need to specify --restore-precision argument.')
+        print(f'First line of the first file contains timestamp with length of {ts} while precision argument is set to "{precision}".')
+        print('Generally, it is 10 for s, 13 for ms, 16 for u, 19 for ns.')
+        print()
 
     if input(f'> Confirm restore into "{db}" db? [yes/no] ') != 'yes':
         sys.exit()
