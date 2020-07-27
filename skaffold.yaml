@@ -1,0 +1,11 @@
+apiVersion: skaffold/v2beta5
+kind: Config
+metadata:
+  name: influxdb-tools
+build:
+  artifacts:
+  - image: image-we-want
+deploy:
+  kubectl:
+    manifests:
+    - k8s.yaml
