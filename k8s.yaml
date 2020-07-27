@@ -1,0 +1,17 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: influxdb-migrate
+spec:
+  schedule: "*/1 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: influxdb-migrate
+            image: image-we-want
+            args:
+            - arguments
+            - etc
+          restartPolicy: OnFailure
