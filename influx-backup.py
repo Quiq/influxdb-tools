@@ -220,7 +220,7 @@ def write_points(db, lines, chunk_delay, precision):
     sys.exit(-1)
 
 
-def restore(db, chunk_delay, measurement_delay, precision):
+def restore(db, chunk_delay, measurement_delay, precision, force):
     """Restore from a backup."""
     if not os.path.exists(DIR):
         print(f'Backup dir "{DIR}" does not exist')
@@ -265,7 +265,7 @@ def restore(db, chunk_delay, measurement_delay, precision):
         print('Generally, it is 10 for s, 13 for ms, 16 for u, 19 for ns.')
         print()
 
-    if input(f'> Confirm restore into "{db}" db? [yes/no] ') != 'yes':
+    if not force and input(f'> Confirm restore into "{db}" db? [yes/no] ') != 'yes':
         sys.exit()
 
     print()
@@ -330,6 +330,7 @@ if __name__ == '__main__':
     parser.add_argument('--dump-since', help='start date in the format YYYY-MM-DD (starting 00:00:00) or YYYY-MM-DDTHH:MM:SSZ')
     parser.add_argument('--dump-until', help='end date in the format YYYY-MM-DD (exclusive) or YYYY-MM-DDTHH:MM:SSZ')
     parser.add_argument('--restore', action='store_true', help='restore from a backup')
+    parser.add_argument('--force', action='store_true', help='restore without prompt')
     parser.add_argument('--restore-db', help='database target of restore')
     parser.add_argument('--restore-precision', help='restore precision: ns,u,ms,s,m,h. Default: ns', default='ns')
     parser.add_argument('--restore-chunk-delay', help='restore delay in sec or subsec between chunks of %d points' % WRITE_CHUNK_SIZE)
@@ -396,7 +397,7 @@ if __name__ == '__main__':
 
         print(f'<< {now()}')
         print(f'Starting restore from "{DIR}" dir to "{args.restore_db}" db.\n')
-        restore(args.restore_db, args.restore_chunk_delay, args.restore_measurement_delay, args.restore_precision)
+        restore(args.restore_db, args.restore_chunk_delay, args.restore_measurement_delay, args.restore_precision, args.force)
         print('Done.')
         print(f'<< {now()}')
 
