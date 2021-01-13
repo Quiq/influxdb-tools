@@ -1,5 +1,9 @@
 # InfluxDB Tools
 
+## line-protocol-to-clickhouse.py
+
+Load influxdb line-protocol data into Clickhouse. This script helps to migrate off influxdb!
+
 ## influx-backup.py
 
 InfluxDB backup/restore script using HTTP API and line-protocol format.
