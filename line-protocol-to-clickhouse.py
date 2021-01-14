@@ -3,7 +3,7 @@
 
 This script helps to migrate off influxdb!
 
-Clickhouse password can be set via CH_PASSWORD env var.
+Clickhouse password should be set via CH_PASSWORD env var if not blank.
 
 Requirements:
 pip3 install line-protocol-parser clickhouse-driver
@@ -20,9 +20,7 @@ import time
 from clickhouse_driver import Client
 from line_protocol_parser import parse_line
 
-DEFAULT_ENGINE = 'MergeTree'
-DEFAULT_CHUNK_SIZE = 100000
-AUTO_SCHEMA = {}
+DEFAULT_CHUNK_SIZE = 10**6
 
 
 def filter_measurements(measurements, from_measurement, ignore_measurements):
@@ -54,76 +52,37 @@ def sanitize_column_name(i):
     return i.replace('-', '_')
 
 
-def manage_schema(client, data, args):
-    """Create/drop table if requested."""
-    measurement = data['measurement']
-    if AUTO_SCHEMA.get(measurement):
-        return
-
-    if args.auto_drop_schema:
-        query = f'''
-            DROP TABLE IF EXISTS `{measurement}`'''
-        print(query)
-        client.execute(query)
-
-    if args.auto_create_schema:
-        columns = ''
-        for i in data['tags'].keys():
-            i = sanitize_column_name(i)
-            columns = columns + f'`{i}` String, '
-
-        for k, v in data['fields'].items():
-            k = sanitize_column_name(k)
-            if type(v) == int:
-                columns = columns + f'`{k}` Int64, '
-            elif type(v) == float:
-                columns = columns + f'`{k}` Float64, '
-            elif type(v) == bool:
-                columns = columns + f'`{k}` Boolean, '
-            elif type(v) == str:
-                columns = columns + f'`{k}` String, '
-            else:
-                print('Unknown type: ', k, v)
-                sys.exit(-1)
-
-        query = f'''
-            CREATE TABLE IF NOT EXISTS `{measurement}` (
-                {columns}
-                `time` DateTime64(0) CODEC(DoubleDelta)
-            ) ENGINE = {DEFAULT_ENGINE} ORDER BY (time)
-        '''
-        print(query)
-        client.execute(query)
-
-    AUTO_SCHEMA[measurement] = True
-
-
 def write_records(client, lines, args):
     """Write records into clickhouse."""
     if args.chunk_delay:
         time.sleep(float(args.chunk_delay))
 
     records = []
+    prev_columns = ''
     for i in lines:
         data = parse_line(i)
-        time_str = str(data['time'])
         # len(time)==10 for s
         # len(time)==13 for ms
         # len(time)==16 for u
         # len(time)==19 for ns - influx default
-        # Assuming `time` DateTime64(0) where 0 is subsec precision which is s
-        row = {'time': int(data['time'] / 10**(len(time_str)-10))}
+        # Assuming `time` is DateTime64(0) where 0 is subsec precision which is s
+        row = {'time': int(data['time'] / 10**(len(str(data['time']))-10))}
         row.update(data['tags'])
         row.update(data['fields'])
         # Sanitize column names
         row = dict((sanitize_column_name(k), v) for k, v in row.items())
+        columns = ','.join(row.keys())
+        if not prev_columns:
+            prev_columns = columns
+
+        if columns != prev_columns:
+            # Column change detected, write what we have collected
+            client.execute(f'INSERT INTO `{data["measurement"]}` ({prev_columns}) VALUES', records)
+            prev_columns = columns
+            records = []
+
         records.append(row)
 
-    # Drop/create table if requested.
-    manage_schema(client, data, args)
-
-    # Write records
-    columns = ','.join(row.keys())
     client.execute(f'INSERT INTO `{data["measurement"]}` ({columns}) VALUES', records)
 
 
@@ -200,7 +159,7 @@ def now():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Load influxdb line-protocol backup into clickhouse')
     parser.add_argument('--host', help='Clickhouse host', default='localhost')
-    parser.add_argument('--user', help='Clickhouse user. The password can be set via CH_PASSWORD env var.', default='default')
+    parser.add_argument('--user', help='Clickhouse user. The password should be set via CH_PASSWORD env var if not blank.', default='default')
     parser.add_argument('--dir', required=True, help='directory with the backup to restore form')
     parser.add_argument('--db', required=True, help='Clickhouse database to restore into')
     parser.add_argument('--measurements', help='comma-separated list of measurements to restore')
@@ -211,8 +170,6 @@ if __name__ == '__main__':
     parser.add_argument('--chunk-delay', help='restore delay in sec or subsec between chunks')
     parser.add_argument('--measurement-delay', help='restore delay in sec or subsec between measurements')
     parser.add_argument('--force', action='store_true', help='do not ask for confirmation')
-    parser.add_argument('--auto-create-schema', action='store_true', help='create table if not exists from the first measurement record info')
-    parser.add_argument('--auto-drop-schema', action='store_true', help='drop table if exists before restore')
     args = parser.parse_args()
 
     if 'REQUESTS_CA_BUNDLE' not in os.environ:

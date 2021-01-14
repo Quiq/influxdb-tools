@@ -1,8 +1,10 @@
 # InfluxDB Tools
 
-## line-protocol-to-clickhouse.py
+## Scripts to migrate off influxdb!
 
-Load influxdb line-protocol data into Clickhouse. This script helps to migrate off influxdb!
+* schema-influx-to-clickhouse.py - Generate table schemas for Clickhouse based on influxdb measurements.
+
+* line-protocol-to-clickhouse.py - Load influxdb line-protocol backup data into Clickhouse.
 
 ## influx-backup.py
 
