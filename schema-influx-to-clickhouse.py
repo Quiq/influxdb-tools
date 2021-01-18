@@ -15,8 +15,6 @@ import sys
 
 import requests
 
-TIME_COLUMN_TYPE = 'DateTime64(0) CODEC(DoubleDelta)'
-
 
 def query_influxdb(args, params):
     """Run query on influxdb."""
@@ -91,11 +89,11 @@ def generate_schemas(args, mstagfields):
             if v == 'integer':
                 columns.append(f'`{k}` Int64')
             elif v == 'float':
-                columns.append(f'`{k}` Float64')
+                columns.append(f'`{k}` Float32')
             elif v == 'string':
                 columns.append(f'`{k}` String')
             elif v == 'tag':
-                columns.append(f'`{k}` String')
+                columns.append(f'`{k}` LowCardinality(String)')
                 primary_key.append(f'`{k}`')
             else:
                 print(f'Unknown type on {table}: {k} {v}')
@@ -103,14 +101,14 @@ def generate_schemas(args, mstagfields):
 
         columns = ',\n                '.join(columns)
         columns = columns + ','
-        primary_key.append('`time`')
         primary_key = ', '.join(primary_key)
         query = f'''
             CREATE TABLE `{table}` (
                 {columns}
-                `time` {TIME_COLUMN_TYPE}
+                `time` DateTime CODEC(DoubleDelta)
             ) ENGINE = {args.engine}
-            PRIMARY KEY ({primary_key});
+            PARTITION BY toYYYYMM(time)
+            ORDER BY ({primary_key});
         '''
         print(query)
 
