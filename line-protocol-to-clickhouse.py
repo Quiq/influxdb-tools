@@ -90,6 +90,7 @@ def restore(args):
     """Restore from a backup."""
     password = os.environ.get('CH_PASSWORD', '')
     client = Client(host=args.host, user=args.user, password=password, database=args.db)
+    client.execute('SET max_partitions_per_insert_block=1000')
 
     if not os.path.exists(args.dir):
         print(f'Backup dir "{args.dir}" does not exist')
