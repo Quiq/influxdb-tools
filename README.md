@@ -21,8 +21,6 @@ InfluxDB backup/restore script using HTTP API and line-protocol format.
 * Delayed restore
 * Gzip support for backup/restore process
 
-Requires Python `3.5+` and `requests` module. Tested on InfluxDB `1.3.6`.
-
 It is recommended to do a delayed restore using `--restore-chunk-delay`, `--restore-measurement-delay`
 so your InfluxDB instance does not run out of memory or IO pretty fast.
 
@@ -94,30 +92,4 @@ Restore only `heartbeat` measurement from `stats` dir into `stats_new` db:
 ```
 ./influx-backup.py --url https://influxdb.localhost:8086 --user admin --restore --restore-db stats_new \
     --dir stats --measurements heartbeat
-```
-
-## influx-cq.py
-
-Create continuous queries for InfluxDB according to the list of metrics.
-
-[Work in progess]
-
-## Usage
-```
-usage: influx-cq.py [-h] [--host HOST] [--port PORT] [--user USER]
-                    [--pass PASS] [--prom-db PROM_DB] [--trend-db TREND_DB]
-                    [--drop-trend-db] [--exit-on-cq]
-
-Script for creating CQ queries on InfluxDB
-
-optional arguments:
-  -h, --help           show this help message and exit
-  --host HOST          InfluxDB host
-  --port PORT          InfluxDB port
-  --user USER          InfluxDB username
-  --pass PASS          InfluxDB password
-  --prom-db PROM_DB    InfluxDB db with raw prometheus data
-  --trend-db TREND_DB  InfluxDB db for trending data
-  --drop-trend-db      Drop trending db
-  --exit-on-cq         Exit when any continuous queries exist
 ```
