@@ -15,12 +15,12 @@ import functools
 import gzip
 import os
 import sys
-import time
 
 from clickhouse_driver import Client
 from line_protocol_parser import parse_line
 
-DEFAULT_CHUNK_SIZE = 10**6
+DEFAULT_INSERT_SIZE = 10**6
+SETTINGS = ['SET max_partitions_per_insert_block=1000']
 
 
 def filter_measurements(measurements, from_measurement, ignore_measurements):
@@ -47,50 +47,64 @@ def filter_measurements(measurements, from_measurement, ignore_measurements):
     return measurements
 
 
+def now():
+    """Return formatted current time."""
+    return datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
+
+
 def sanitize_column_name(i):
     """Sanitize column name."""
     return i.replace('-', '_')
 
 
-def write_records(client, lines, args):
+def write_records(client, columns, lines):
     """Write records into clickhouse."""
-    if args.chunk_delay:
-        time.sleep(float(args.chunk_delay))
-
     records = []
-    prev_columns = ''
     for i in lines:
         data = parse_line(i)
         # len(time)==10 for s
         # len(time)==13 for ms
         # len(time)==16 for u
         # len(time)==19 for ns - influx default
-        # Assuming `time` is DateTime64(0) where 0 is subsec precision which is s
+        # Assuming `time` is DateTime, convert time to seconds.
         row = {'time': int(data['time'] / 10**(len(str(data['time']))-10))}
         row.update(data['tags'])
         row.update(data['fields'])
         # Sanitize column names
         row = dict((sanitize_column_name(k), v) for k, v in row.items())
-        columns = ','.join(row.keys())
-        if not prev_columns:
-            prev_columns = columns
+        row_columns = ','.join(row.keys())
 
-        if columns != prev_columns:
-            # Column change detected, write what we have collected
-            client.execute(f'INSERT INTO `{data["measurement"]}` ({prev_columns}) VALUES', records)
-            prev_columns = columns
-            records = []
+        # Add missing columns.
+        for k, v in columns.items():
+            if k in row_columns:
+                continue
+
+            v = v.lower()
+            if 'string' in v:
+                row[k] = ''
+            elif 'int' in v or 'float' in v:
+                row[k] = 0
+            else:
+                print(f'Need to set default value for column "{k}" of type "{v}" in the script!')
+                sys.exit(-1)
 
         records.append(row)
 
-    client.execute(f'INSERT INTO `{data["measurement"]}` ({columns}) VALUES', records)
+    row_columns = ','.join(columns.keys())
+    query = f'INSERT INTO `{data["measurement"]}` ({row_columns}) VALUES'
+    try:
+        client.execute(query, records)
+    except ConnectionResetError:
+        print('ConnectionResetError: retrying...')
+        client.execute(query, records)
 
 
 def restore(args):
     """Restore from a backup."""
     password = os.environ.get('CH_PASSWORD', '')
     client = Client(host=args.host, user=args.user, password=password, database=args.db)
-    client.execute('SET max_partitions_per_insert_block=1000')
+    for i in SETTINGS:
+        client.execute(i)
 
     if not os.path.exists(args.dir):
         print(f'Backup dir "{args.dir}" does not exist')
@@ -126,10 +140,10 @@ def restore(args):
 
     print()
     for m in measurements:
-        if m != measurements[0] and args.measurement_delay:
-            time.sleep(float(args.measurement_delay))
-
         print(f'Loading {m}... ', end='')
+        data = client.execute(f"select name, type from system.columns where database='{args.db}' and table='{m}'")
+        columns = dict(x for x in data)
+
         lines = []
         line_count = 0
         if args.gzip:
@@ -138,23 +152,18 @@ def restore(args):
             f = open(f'{args.dir}/{m}', 'r')
 
         for i in f:
-            if len(lines) == args.chunk_size:
-                write_records(client, lines, args)
+            if len(lines) == args.insert_size:
+                write_records(client, columns, lines)
                 lines = []
-                line_count += args.chunk_size
+                line_count += args.insert_size
 
             lines.append(i)
 
         if lines:
-            write_records(client, lines, args)
+            write_records(client, columns, lines)
 
         print(line_count+len(lines))
         f.close()
-
-
-def now():
-    """Return formatted current time."""
-    return datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
 
 
 if __name__ == '__main__':
@@ -167,9 +176,7 @@ if __name__ == '__main__':
     parser.add_argument('--ignore-measurements', help='comma-separated list of measurements to skip from restore (ignored when using --measurements)')
     parser.add_argument('--from-measurement', help='restore starting from this measurement and on (ignored when using --measurements)')
     parser.add_argument('--gzip', action='store_true', help='restore from gzipped files')
-    parser.add_argument('--chunk-size', help='number of records to insert with a single statement', default=DEFAULT_CHUNK_SIZE)
-    parser.add_argument('--chunk-delay', help='restore delay in sec or subsec between chunks')
-    parser.add_argument('--measurement-delay', help='restore delay in sec or subsec between measurements')
+    parser.add_argument('--insert-size', help='number of records to insert with a single statement', default=DEFAULT_INSERT_SIZE)
     parser.add_argument('--force', action='store_true', help='do not ask for confirmation')
     args = parser.parse_args()
 
