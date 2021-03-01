@@ -108,7 +108,7 @@ def generate_schemas(args, mstagfields):
                 `time` DateTime CODEC(DoubleDelta)
             ) ENGINE = {args.engine}
             PARTITION BY {args.partition_by}
-            ORDER BY ({primary_key});
+            ORDER BY ({primary_key}, time);
         '''
         print(query)
 
@@ -118,7 +118,7 @@ if __name__ == '__main__':
     parser.add_argument('--url', required=True, help='Influxdb url')
     parser.add_argument('--user', help='Influxdb user. The password should be set via INFLUX_PASSWORD env var.', default='admin')
     parser.add_argument('--db', required=True, help='Influxdb database to get measurements from')
-    parser.add_argument('--engine', help='Clickhouse table engine to define', default='MergeTree')
+    parser.add_argument('--engine', help='Clickhouse table engine to define', default='ReplacingMergeTree')
     parser.add_argument('--partition-by', help='Clickhouse table PARTITION BY definition', default='toYYYYMM(time)')
     parser.add_argument('--verbose', action='store_true', help='verbose mode')
     args = parser.parse_args()
