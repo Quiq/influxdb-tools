@@ -143,6 +143,9 @@ def restore(args):
         print(f'Loading {m}... ', end='')
         data = client.execute(f"select name, type from system.columns where database='{args.db}' and table='{m}'")
         columns = dict(x for x in data)
+        if not columns:
+            print('Skipping because the corresponding table does not exist.')
+            continue
 
         lines = []
         line_count = 0
