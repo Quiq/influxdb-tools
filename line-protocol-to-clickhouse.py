@@ -17,7 +17,7 @@ import os
 import sys
 
 from clickhouse_driver import Client
-from line_protocol_parser import parse_line
+from line_protocol_parser import LineFormatError, parse_line
 
 DEFAULT_INSERT_SIZE = 10**6
 SETTINGS = ['SET max_partitions_per_insert_block=1000']
@@ -61,7 +61,12 @@ def write_records(client, columns, lines):
     """Write records into clickhouse."""
     records = []
     for i in lines:
-        data = parse_line(i)
+        try:
+            data = parse_line(i)
+        except LineFormatError as err:
+            print(f'LineFormatError: "{err}". Line: {i}')
+            continue
+
         # len(time)==10 for s
         # len(time)==13 for ms
         # len(time)==16 for u
@@ -94,8 +99,9 @@ def write_records(client, columns, lines):
     query = f'INSERT INTO `{data["measurement"]}` ({row_columns}) VALUES'
     try:
         client.execute(query, records)
-    except ConnectionResetError:
-        print('ConnectionResetError: retrying...')
+    except BaseException as err:
+        print(err)
+        print('Retrying...')
         client.execute(query, records)
 
 
