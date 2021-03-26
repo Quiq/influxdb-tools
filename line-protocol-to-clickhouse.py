@@ -98,6 +98,8 @@ def write_records(client, columns, lines, time_precision):
     query = f'INSERT INTO `{data["measurement"]}` ({row_columns}) VALUES'
     try:
         client.execute(query, records)
+    except KeyError as err:
+        print(f'KeyError: {err}')
     except BaseException as err:
         print(err)
         print('Retrying...')
