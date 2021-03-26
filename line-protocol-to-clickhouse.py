@@ -57,7 +57,7 @@ def sanitize_column_name(i):
     return i.replace('-', '_')
 
 
-def write_records(client, columns, lines):
+def write_records(client, columns, lines, time_precision):
     """Write records into clickhouse."""
     records = []
     for i in lines:
@@ -71,8 +71,7 @@ def write_records(client, columns, lines):
         # len(time)==13 for ms
         # len(time)==16 for u
         # len(time)==19 for ns - influx default
-        # Assuming `time` is DateTime, convert time to seconds.
-        row = {'time': int(data['time'] / 10**(len(str(data['time']))-10))}
+        row = {'time': int(data['time'] / 10**(len(str(data['time']))-10) * 10**time_precision)}
         row.update(data['tags'])
         row.update(data['fields'])
         # Sanitize column names
@@ -162,14 +161,14 @@ def restore(args):
 
         for i in f:
             if len(lines) == args.insert_size:
-                write_records(client, columns, lines)
+                write_records(client, columns, lines, args.time_precision)
                 lines = []
                 line_count += args.insert_size
 
             lines.append(i)
 
         if lines:
-            write_records(client, columns, lines)
+            write_records(client, columns, lines, args.time_precision)
 
         print(line_count+len(lines))
         f.close()
@@ -186,6 +185,7 @@ if __name__ == '__main__':
     parser.add_argument('--from-measurement', help='restore starting from this measurement and on (ignored when using --measurements)')
     parser.add_argument('--gzip', action='store_true', help='restore from gzipped files')
     parser.add_argument('--insert-size', help='number of records to insert with a single statement', default=DEFAULT_INSERT_SIZE)
+    parser.add_argument('--time-precision', help='time precision to store, corresponds to the type of "time" column. Default 3, i.e. ms', default=3)
     parser.add_argument('--force', action='store_true', help='do not ask for confirmation')
     args = parser.parse_args()
 

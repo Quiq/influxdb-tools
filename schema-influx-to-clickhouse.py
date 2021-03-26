@@ -105,7 +105,7 @@ def generate_schemas(args, mstagfields):
         query = f'''
             CREATE TABLE `{table}` (
                 {columns}
-                `time` DateTime CODEC(DoubleDelta)
+                `time` {args.time_type} CODEC(DoubleDelta)
             ) ENGINE = {args.engine}
             PARTITION BY {args.partition_by}
             ORDER BY ({primary_key}, time);
@@ -120,6 +120,7 @@ if __name__ == '__main__':
     parser.add_argument('--db', required=True, help='Influxdb database to get measurements from')
     parser.add_argument('--engine', help='Clickhouse table engine to define', default='ReplacingMergeTree')
     parser.add_argument('--partition-by', help='Clickhouse table PARTITION BY definition', default='toYYYYMM(time)')
+    parser.add_argument('--time-type', help='type of "time" column', default='DateTime')
     parser.add_argument('--verbose', action='store_true', help='verbose mode')
     args = parser.parse_args()
 
