@@ -80,6 +80,10 @@ def write_records(client, columns, lines, args):
         row = dict((sanitize_column_name(k), v) for k, v in row.items())
         row_columns = ','.join(row.keys())
 
+        if table_name not in columns:
+            print(f'Skipping 1 row because {table_name} table does not exist.')
+            continue
+
         # Add missing columns.
         for k, v in columns[table_name].items():
             if k in row_columns:
