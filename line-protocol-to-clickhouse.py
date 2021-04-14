@@ -57,9 +57,10 @@ def sanitize_column_name(i):
     return i.replace('-', '_')
 
 
-def write_records(client, columns, lines, time_precision):
+def write_records(client, columns, lines, args):
     """Write records into clickhouse."""
-    records = []
+    records = {}
+    # Parse records.
     for i in lines:
         try:
             data = parse_line(i)
@@ -67,11 +68,12 @@ def write_records(client, columns, lines, time_precision):
             print(f'LineFormatError: "{err}". Line: {i}')
             continue
 
+        table_name = data['measurement']
         # len(time)==10 for s
         # len(time)==13 for ms
         # len(time)==16 for u
         # len(time)==19 for ns - influx default
-        row = {'time': int(data['time'] / 10**(len(str(data['time']))-10) * 10**time_precision)}
+        row = {'time': int(data['time'] / 10**(len(str(data['time']))-10) * 10**args.time_precision)}
         row.update(data['tags'])
         row.update(data['fields'])
         # Sanitize column names
@@ -79,7 +81,7 @@ def write_records(client, columns, lines, time_precision):
         row_columns = ','.join(row.keys())
 
         # Add missing columns.
-        for k, v in columns.items():
+        for k, v in columns[table_name].items():
             if k in row_columns:
                 continue
 
@@ -92,24 +94,30 @@ def write_records(client, columns, lines, time_precision):
                 print(f'Need to set default value for column "{k}" of type "{v}" in the script!')
                 sys.exit(-1)
 
-        records.append(row)
+        if table_name not in records:
+            records[table_name] = []
 
-    row_columns = ','.join(columns.keys())
-    query = f'INSERT INTO `{data["measurement"]}` ({row_columns}) VALUES'
-    try:
-        client.execute(query, records)
-    except KeyError as err:
-        print(f'KeyError: {err}')
-    except BaseException as err:
-        print(err)
-        print('Retrying...')
-        client.execute(query, records)
+        records[table_name].append(row)
+
+    # Write records.
+    for table_name, rows in records.items():
+        print(f'  {table_name}:{len(rows)}')
+        row_columns = ','.join(columns[table_name].keys())
+        query = f'INSERT INTO `{table_name}` ({row_columns}) VALUES'
+        try:
+            client.execute(query, rows)
+        except KeyError as err:
+            print(f'KeyError: {err}')
+        except BaseException as err:
+            print(err)
+            print('Retrying...')
+            client.execute(query, rows)
 
 
 def restore(args):
     """Restore from a backup."""
     password = os.environ.get('CH_PASSWORD', '')
-    client = Client(host=args.host, user=args.user, password=password, database=args.db)
+    client = Client(host=args.host, port=args.port, secure=args.secure, user=args.user, password=password, database=args.db)
     for i in SETTINGS:
         client.execute(i)
 
@@ -146,11 +154,22 @@ def restore(args):
         sys.exit(0)
 
     print()
+    # Get list of columns for each table.
+    data = client.execute(f"SELECT table, name, type FROM system.columns WHERE database='{args.db}'")
+    columns = {}
+    for x in data:
+        if x[0] not in columns:
+            columns[x[0]] = {}
+
+        columns[x[0]][x[1]] = x[2]
+
+    # Iterate over files.
     for m in measurements:
         print(f'Loading {m}... ', end='')
-        data = client.execute(f"select name, type from system.columns where database='{args.db}' and table='{m}'")
-        columns = dict(x for x in data)
-        if not columns:
+        if args.mixed_files:
+            print()
+
+        if not args.mixed_files and m not in columns:
             print('Skipping because the corresponding table does not exist.')
             continue
 
@@ -163,14 +182,14 @@ def restore(args):
 
         for i in f:
             if len(lines) == args.insert_size:
-                write_records(client, columns, lines, args.time_precision)
+                write_records(client, columns, lines, args)
                 lines = []
                 line_count += args.insert_size
 
             lines.append(i)
 
         if lines:
-            write_records(client, columns, lines, args.time_precision)
+            write_records(client, columns, lines, args)
 
         print(line_count+len(lines))
         f.close()
@@ -179,6 +198,8 @@ def restore(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Load influxdb line-protocol backup into clickhouse')
     parser.add_argument('--host', help='Clickhouse host', default='localhost')
+    parser.add_argument('--port', help='Clickhouse port', default=9000)
+    parser.add_argument('--secure', help='Clickhouse secure connection', action='store_true')
     parser.add_argument('--user', help='Clickhouse user. The password should be set via CH_PASSWORD env var if not blank.', default='default')
     parser.add_argument('--dir', required=True, help='directory with the backup to restore form')
     parser.add_argument('--db', required=True, help='Clickhouse database to restore into')
@@ -188,6 +209,7 @@ if __name__ == '__main__':
     parser.add_argument('--gzip', action='store_true', help='restore from gzipped files')
     parser.add_argument('--insert-size', help='number of records to insert with a single statement', default=DEFAULT_INSERT_SIZE)
     parser.add_argument('--time-precision', help='time precision to store, corresponds to the type of "time" column. Default 3, i.e. ms', default=3)
+    parser.add_argument('--mixed-files', action='store_true', help='backup files contain mixed measurements, file names are not table names etc.')
     parser.add_argument('--force', action='store_true', help='do not ask for confirmation')
     args = parser.parse_args()
 
