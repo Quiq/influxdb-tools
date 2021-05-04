@@ -106,8 +106,8 @@ def write_records(client, columns, lines, args):
     # Write records.
     for table_name, rows in records.items():
         print(f'  {table_name}:{len(rows)}')
-        row_columns = ','.join(columns[table_name].keys())
-        query = f'INSERT INTO `{table_name}` ({row_columns}) VALUES'
+        row_columns = '`,`'.join(columns[table_name].keys())
+        query = f'INSERT INTO `{table_name}` (`{row_columns}`) VALUES'
         try:
             client.execute(query, rows)
         except KeyError as err:
