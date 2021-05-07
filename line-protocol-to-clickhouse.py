@@ -20,7 +20,7 @@ from clickhouse_driver import Client
 from line_protocol_parser import LineFormatError, parse_line
 
 DEFAULT_INSERT_SIZE = 10**6
-SETTINGS = ['SET max_partitions_per_insert_block=1000']
+INSERT_SETTINGS = {'max_partitions_per_insert_block': 1000}
 
 
 def filter_measurements(measurements, from_measurement, ignore_measurements):
@@ -109,21 +109,19 @@ def write_records(client, columns, lines, args):
         row_columns = '`,`'.join(columns[table_name].keys())
         query = f'INSERT INTO `{table_name}` (`{row_columns}`) VALUES'
         try:
-            client.execute(query, rows)
+            client.execute(query, rows, settings=INSERT_SETTINGS)
         except KeyError as err:
             print(f'KeyError: {err}')
         except BaseException as err:
             print(err)
             print('Retrying...')
-            client.execute(query, rows)
+            client.execute(query, rows, settings=INSERT_SETTINGS)
 
 
 def restore(args):
     """Restore from a backup."""
     password = os.environ.get('CH_PASSWORD', '')
     client = Client(host=args.host, port=args.port, secure=args.secure, user=args.user, password=password, database=args.db)
-    for i in SETTINGS:
-        client.execute(i)
 
     if not os.path.exists(args.dir):
         print(f'Backup dir "{args.dir}" does not exist')
