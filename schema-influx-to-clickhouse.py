@@ -108,7 +108,7 @@ def generate_schemas(args, mstagfields):
                 `time` {args.time_type} CODEC(DoubleDelta)
             ) ENGINE = {args.engine}
             PARTITION BY {args.partition_by}
-            ORDER BY ({primary_key}, time);
+            ORDER BY (`time`, {primary_key});
         '''
         print(query)
 
