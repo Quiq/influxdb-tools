@@ -20,7 +20,7 @@ from clickhouse_driver import Client
 from line_protocol_parser import LineFormatError, parse_line
 
 DEFAULT_INSERT_SIZE = 10**6
-INSERT_SETTINGS = {'max_partitions_per_insert_block': 1000}
+INSERT_SETTINGS = {'max_partitions_per_insert_block': 5000}
 
 
 def filter_measurements(measurements, from_measurement, ignore_measurements):
@@ -86,7 +86,7 @@ def write_records(client, columns, lines, args):
 
         # Add missing columns.
         for k, v in columns[table_name].items():
-            if k in row_columns:
+            if k in row.keys():
                 continue
 
             v = v.lower()
@@ -105,17 +105,19 @@ def write_records(client, columns, lines, args):
 
     # Write records.
     for table_name, rows in records.items():
-        print(f'  {table_name}:{len(rows)}')
         row_columns = '`,`'.join(columns[table_name].keys())
         query = f'INSERT INTO `{table_name}` (`{row_columns}`) VALUES'
         try:
             client.execute(query, rows, settings=INSERT_SETTINGS)
         except KeyError as err:
-            print(f'KeyError: {err}')
+            print(f'KeyError: {err}. Skipping batch of {len(rows)} points.')
+            continue
         except BaseException as err:
             print(err)
             print('Retrying...')
             client.execute(query, rows, settings=INSERT_SETTINGS)
+
+        print(f'  {table_name}:{len(rows)}')
 
 
 def restore(args):
@@ -167,7 +169,7 @@ def restore(args):
 
     # Iterate over files.
     for m in measurements:
-        print(f'Loading {m}... ', end='')
+        print(f'Loading {m}... ')
         if args.mixed_files:
             print()
 
@@ -193,7 +195,7 @@ def restore(args):
         if lines:
             write_records(client, columns, lines, args)
 
-        print(line_count+len(lines))
+        print('- Total:', line_count+len(lines))
         f.close()
 
 
