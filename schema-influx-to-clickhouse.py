@@ -101,6 +101,7 @@ def generate_schemas(args, mstagfields):
 
         columns = ',\n                '.join(columns)
         columns = columns + ','
+        primary_key.append('`time`')  # Must go last for CH performance reasons.
         primary_key = ', '.join(primary_key)
         query = f'''
             CREATE TABLE `{table}` (
@@ -108,7 +109,7 @@ def generate_schemas(args, mstagfields):
                 `time` {args.time_type} CODEC(DoubleDelta)
             ) ENGINE = {args.engine}
             PARTITION BY {args.partition_by}
-            ORDER BY (`time`, {primary_key});
+            ORDER BY ({primary_key});
         '''
         print(query)
 
