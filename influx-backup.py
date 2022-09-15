@@ -20,6 +20,18 @@ READ_CHUCK_SIZE = 10000
 WRITE_CHUNK_SIZE = 5000
 
 
+def measurement2filename(m):
+    return m.replace('/', '\u2571')
+
+
+def filename2measurement(d):
+    return d.replace('\u2571', '/')
+
+
+def identifier2lineprotocol(d):
+    return d.replace(' ', r'\ ').replace(',', r'\,').replace('=', r'\=')
+
+
 def query_influxdb(params):
     """Run query on influxdb."""
     r = requests.get(URL+'/query', auth=AUTH, params=params)
@@ -96,19 +108,19 @@ def format_rows(m, msfields, data):
                         elif msfields[col] == 'integer':
                             val = f'{val}i'
 
-                        fields.append(f'{col}={val}')
+                        fields.append(f'{identifier2lineprotocol(col)}={val}')
                     else:
                         if type(val) == str:
-                            val = val.replace(' ', '\ ').replace(',', '\,').replace('=', '\=')
+                            val = identifier2lineprotocol(val)
 
-                        tags.append(f'{col}={val}')
+                        tags.append(f'{identifier2lineprotocol(col)}={val}')
 
                 if timestamp == 0 or len(fields) == 0:
                     print(f'No "time" column or 0 fields for "{m}": time {timestamp}, fields {fields}')
                     sys.exit(-1)
 
                 # Format: agent_status,agent=foo\ bar,tenant=roman duration_in_old_status=1207920,new_status="offline",old_status="available" 1496310265009000000
-                rows.append(f"{m},{','.join(tags)} {','.join(fields)} {timestamp}\n")
+                rows.append(f"{identifier2lineprotocol(m)},{','.join(tags)} {','.join(fields)} {timestamp}\n")
 
     return rows
 
@@ -163,9 +175,9 @@ def dump(db, where):
 
         print(f'Dumping {m}... ', end='')
         if GZIP:
-            f = gzip.open(f'{DIR}/{m}.gz', 'wt')
+            f = gzip.open(f'{DIR}/{measurement2filename(m)}.gz', 'wt')
         else:
-            f = open(f'{DIR}/{m}', 'w')
+            f = open(f'{DIR}/{measurement2filename(m)}', 'w')
 
         if RETENTION:
             query = f'SELECT * FROM "{db}"."{RETENTION}"."{m}" {where}'
@@ -201,7 +213,7 @@ def write_points(db, lines, chunk_delay, precision):
     retries = 10
     while retries > 0:
         try:
-            r = requests.post(URL+'/write', auth=AUTH, params=params, data=data)
+            r = requests.post(URL+'/write', auth=AUTH, params=params, data=data.encode('utf-8'))
             if r.status_code == 204:
                 return
 
@@ -235,6 +247,7 @@ def restore(db, chunk_delay, measurement_delay, precision, force):
 
         files.sort()
         measurements = filter_measurements(files)
+        measurements = [filename2measurement(mm) for mm in measurements]
 
     if not measurements:
         print('Nothing to restore. If backup is gzipped, use --gzip option.')
@@ -246,9 +259,9 @@ def restore(db, chunk_delay, measurement_delay, precision, force):
 
     # Sanity check of timestamp precision.
     if GZIP:
-        f = gzip.open(f'{DIR}/{measurements[0]}.gz', 'rt')
+        f = gzip.open(f'{DIR}/{measurement2filename(measurements[0])}.gz', 'rt')
     else:
-        f = open(f'{DIR}/{measurements[0]}', 'r')
+        f = open(f'{DIR}/{measurement2filename(measurements[0])}', 'r')
 
     ts = len(f.readline().split()[-1])
     f.close()
@@ -273,13 +286,13 @@ def restore(db, chunk_delay, measurement_delay, precision, force):
         if m != measurements[0] and measurement_delay:
             time.sleep(float(measurement_delay))
 
-        print(f'Loading {m}... ', end='')
+        print(f'Loading {measurement2filename(m)}... ', end='')
         lines = []
         line_count = 0
         if GZIP:
-            f = gzip.open(f'{DIR}/{m}.gz', 'rt')
+            f = gzip.open(f'{DIR}/{measurement2filename(m)}.gz', 'rt')
         else:
-            f = open(f'{DIR}/{m}', 'r')
+            f = open(f'{DIR}/{measurement2filename(m)}', 'r')
 
         for i in f:
             if len(lines) == WRITE_CHUNK_SIZE:
