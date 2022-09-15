@@ -1,6 +1,6 @@
 # InfluxDB Tools
 
-## Scripts to migrate off influxdb!
+## Scripts to migrate off influxdb to a better database :)
 
 * schema-influx-to-clickhouse.py - Generate table schemas for Clickhouse based on influxdb measurements.
 
