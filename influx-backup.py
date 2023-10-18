@@ -120,7 +120,10 @@ def format_rows(m, msfields, data):
                     sys.exit(-1)
 
                 # Format: agent_status,agent=foo\ bar,tenant=roman duration_in_old_status=1207920,new_status="offline",old_status="available" 1496310265009000000
-                rows.append(f"{identifier2lineprotocol(m)},{','.join(tags)} {','.join(fields)} {timestamp}\n")
+                if tags:
+                    rows.append(f"{identifier2lineprotocol(m)},{','.join(tags)} {','.join(fields)} {timestamp}\n")
+                else:
+                    rows.append(f"{identifier2lineprotocol(m)} {','.join(fields)} {timestamp}\n")
 
     return rows
 
