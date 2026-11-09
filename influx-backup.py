@@ -40,7 +40,7 @@ def query_influxdb(params):
         print(r.status_code, r.text)
         sys.exit(-1)
 
-    data = json.loads(r.text)
+    data = json.loads(r.content)  # bytes, so json detects UTF-8 (r.text may guess latin-1)
     return data
 
 
@@ -178,9 +178,9 @@ def dump(db, where):
 
         print(f'Dumping {m}... ', end='')
         if GZIP:
-            f = gzip.open(f'{DIR}/{measurement2filename(m)}.gz', 'wt')
+            f = gzip.open(f'{DIR}/{measurement2filename(m)}.gz', 'wt', encoding='utf-8')
         else:
-            f = open(f'{DIR}/{measurement2filename(m)}', 'w')
+            f = open(f'{DIR}/{measurement2filename(m)}', 'w', encoding='utf-8')
 
         if RETENTION:
             query = f'SELECT * FROM "{db}"."{RETENTION}"."{m}" {where}'
@@ -262,9 +262,9 @@ def restore(db, chunk_delay, measurement_delay, precision, force):
 
     # Sanity check of timestamp precision.
     if GZIP:
-        f = gzip.open(f'{DIR}/{measurement2filename(measurements[0])}.gz', 'rt')
+        f = gzip.open(f'{DIR}/{measurement2filename(measurements[0])}.gz', 'rt', encoding='utf-8')
     else:
-        f = open(f'{DIR}/{measurement2filename(measurements[0])}', 'r')
+        f = open(f'{DIR}/{measurement2filename(measurements[0])}', 'r', encoding='utf-8')
 
     ts = len(f.readline().split()[-1])
     f.close()
@@ -293,9 +293,9 @@ def restore(db, chunk_delay, measurement_delay, precision, force):
         lines = []
         line_count = 0
         if GZIP:
-            f = gzip.open(f'{DIR}/{measurement2filename(m)}.gz', 'rt')
+            f = gzip.open(f'{DIR}/{measurement2filename(m)}.gz', 'rt', encoding='utf-8')
         else:
-            f = open(f'{DIR}/{measurement2filename(m)}', 'r')
+            f = open(f'{DIR}/{measurement2filename(m)}', 'r', encoding='utf-8')
 
         for i in f:
             if len(lines) == WRITE_CHUNK_SIZE:
